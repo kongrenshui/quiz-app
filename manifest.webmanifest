@@ -1,0 +1,16 @@
+{
+  "name": "刷题考试",
+  "short_name": "刷题",
+  "description": "导入题库、组卷考试、练习与错题本",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f9ff",
+  "theme_color": "#198cff",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
