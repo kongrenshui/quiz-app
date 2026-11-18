@@ -1,11 +1,10 @@
 // 绂荤嚎缂撳瓨锛氬畨瑁呭埌涓诲睆骞曞悗鏂綉涔熻兘鎵撳紑
-const CACHE = 'quizapp-v9';
+const CACHE = 'quizapp-v11';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './icon.svg',
-  './demo-bank.json',
   './lib/xlsx.full.min.js'
 ];
 

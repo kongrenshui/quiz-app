@@ -67,6 +67,7 @@
   .opt.ok{border-color:var(--ok);background:#f0faf4}
   .opt.bad{border-color:var(--bad);background:#fdf3f3}
   .opt b{color:var(--txt2);font-weight:600;min-width:18px}
+  .opt.ro{cursor:default;pointer-events:none;padding:7px 10px;margin-bottom:6px;font-size:14px}
   .empty{text-align:center;color:var(--txt2);padding:36px 10px}
   .timer{font-variant-numeric:tabular-nums;color:var(--blue);font-weight:600}
   .timer.warn{color:var(--bad)}
@@ -81,6 +82,14 @@
   .muted{color:var(--txt2);font-size:13px}
   .ans{color:var(--ok);font-weight:600}
   .myans{color:var(--bad);font-weight:600}
+  /* 精简模式：更大的字和按钮 */
+  body.simple #btnStartPrac,body.simple #btnResumePrac,body.simple #btnRestartPrac{
+    font-size:19px;padding:16px 14px;width:100%;margin-top:8px}
+  body.simple .q .stem{font-size:17px;line-height:1.7}
+  body.simple .opt{padding:15px 13px;font-size:16.5px}
+  body.simple .q .tag{font-size:13px}
+  body.simple #btnPracNext,body.simple #btnPracPrev,body.simple #btnPracExit{
+    font-size:17px;padding:14px 10px}
   @media(max-width:520px){
     .bar{padding:8px 8px;gap:6px} main{padding:12px 10px 80px}
     .logo{font-size:14px}
@@ -151,6 +160,14 @@
         <button class="ghost" id="btnImportAll">导入备份</button>
       </div>
     </div>
+
+    <div class="card">
+      <h3>使用方式</h3>
+      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+        <input type="checkbox" id="simpleMode" style="width:20px;height:20px;margin-top:2px;flex:0 0 auto">
+        <span>精简模式<br><span class="hint">只保留「练习」和「错题本」，打开就是大按钮，适合不熟悉手机的人</span></span>
+      </label>
+    </div>
   </section>
 
   <!-- 考试 -->
@@ -211,6 +228,9 @@
       <div id="resumeBox" style="margin-top:12px"></div>
       <button class="primary" id="btnStartPrac" style="margin-top:12px">开始练习</button>
       <p class="hint" style="margin-top:8px">进度自动保存，退出重进停在原题；起止题号按「顺序」模式计算。</p>
+      <p class="hint" id="simpleExit" style="display:none;margin-top:12px">
+        <a href="#" id="btnSimpleExit" style="color:var(--blue);text-decoration:none">退出精简模式</a>
+      </p>
     </div>
     <div id="pracRun" style="display:none">
       <div class="card">
@@ -727,9 +747,9 @@ function submitExam(auto){
     </div>
     <div class="card"><h3>答题明细</h3>
       ${detail.map((d,i)=>{
-        const opts = d.q._options||d.q.options;
         return `<div style="border-bottom:1px solid var(--line);padding:10px 0">
           <div><b>${i+1}.</b> ${esc(d.q.stem)}</div>
+          ${optionsReviewHTML(d.q, d.ans)}
           <div class="hint">你的答案：<span class="${d.ok?'ans':'myans'}">${esc(d.ans.join(' ')||'未答')}</span>
             · 正确答案：<span class="ans">${esc(d.q.answer.join(' '))}</span></div>
           ${d.q.explanation?`<div class="hint">解析：${esc(d.q.explanation)}</div>`:''}
@@ -949,6 +969,22 @@ function addWrong(q, bankId, myAns){
   }
   save();
 }
+/* 只读的选项列表：标出正确答案（绿）和用户选的（红） */
+function optionsReviewHTML(q, myAns){
+  const opts = q._options || q.options || [];
+  if(!opts.length) return '';
+  const correct = (q.answer || []).map(x => String(x).toUpperCase());
+  const picked = (myAns || []).map(x => String(x).toUpperCase());
+  return '<div style="margin:8px 0 4px">' + opts.map(o=>{
+    const k = String(o.k).toUpperCase();
+    const isC = correct.includes(k);
+    const isP = picked.includes(k);
+    const cls = isC ? 'ok' : (isP ? 'bad' : '');
+    const mark = isC ? ' ✓ 正确答案' : (isP ? ' ✗ 你选的' : '');
+    return `<div class="opt ro ${cls}"><b>${esc(o.k)}</b><span>${esc(o.t)}${mark}</span></div>`;
+  }).join('') + '</div>';
+}
+
 function renderWrong(){
   const box = document.getElementById('wrongList');
   document.getElementById('wrongCount').textContent = DB.wrong.length? `（${DB.wrong.length} 题）` : '';
@@ -956,6 +992,7 @@ function renderWrong(){
   box.innerHTML = DB.wrong.map(w=>`
     <div style="border-bottom:1px solid var(--line);padding:10px 0">
       <div><span class="tag">${TYPES[w.q.type]?.name||''}</span>${esc(w.q.stem)}</div>
+      ${optionsReviewHTML(w.q, w.myAns)}
       <div class="hint">错 ${w.wrongCount} 次 · 上次：${new Date(w.lastAt).toLocaleString()}
         · 你答：<span class="myans">${esc((w.myAns||[]).join(' ')||'未答')}</span>
         · 正确：<span class="ans">${esc(w.q.answer.join(' '))}</span></div>
@@ -1228,6 +1265,29 @@ function renderPracticeSetup(){
   }
 }
 
+/* ================= 精简模式 ================= */
+const SIMPLE_KEY = 'quizapp.simple';
+let SIMPLE = false;
+
+function loadSimple(){
+  try{ SIMPLE = localStorage.getItem(SIMPLE_KEY) === '1'; }catch(e){ SIMPLE = false; }
+}
+function saveSimple(){
+  try{ localStorage.setItem(SIMPLE_KEY, SIMPLE ? '1' : '0'); }catch(e){}
+}
+function applySimpleMode(){
+  document.querySelectorAll('#nav button').forEach(b=>{
+    const t = b.dataset.tab;
+    if(t === 'banks' || t === 'exam' || t === 'stats') b.style.display = SIMPLE ? 'none' : '';
+  });
+  document.body.classList.toggle('simple', SIMPLE);
+  const exit = document.getElementById('simpleExit');
+  if(exit) exit.style.display = SIMPLE ? '' : 'none';
+  const cb = document.getElementById('simpleMode');
+  if(cb) cb.checked = SIMPLE;
+  if(SIMPLE) switchTab('practice');
+}
+
 /* ================= 初始化 ================= */
 function renderAll(){
   renderBanks();
@@ -1287,6 +1347,19 @@ document.getElementById('btnClearWrong').onclick = ()=>{
   DB.wrong = []; save(); renderWrong(); renderStats();
 };
 document.getElementById('btnExport').onclick = exportData;
+document.getElementById('simpleMode').addEventListener('change', e=>{
+  SIMPLE = e.target.checked;
+  saveSimple();
+  applySimpleMode();
+  toast(SIMPLE ? '已开启精简模式' : '已关闭精简模式');
+});
+document.getElementById('btnSimpleExit').onclick = e=>{
+  e.preventDefault();
+  SIMPLE = false;
+  saveSimple();
+  applySimpleMode();
+  toast('已退出精简模式');
+};
 document.getElementById('btnImportUrl').onclick = async ()=>{
   const el = document.getElementById('bankUrl');
   const url = (el.value || '').trim();
@@ -1314,7 +1387,7 @@ document.getElementById('btnImportAll').onclick = ()=>{
   inp.click();
 };
 
-load(); loadPrac(); renderAll();
+load(); loadPrac(); loadSimple(); renderAll(); applySimpleMode();
 
 // 链接里带 ?bank=地址 时自动导入（分享给别人的专属链接）
 (function(){
